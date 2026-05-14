@@ -1,166 +1,190 @@
-<style>
-.mm-wrap { padding: 1rem 0; font-family: var(--font-sans); }
-.controls { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 1.25rem; align-items: center; }
-.ctrl-group { display: flex; gap: 6px; flex-wrap: wrap; }
-.ctrl-label { font-size: 12px; color: var(--color-text-secondary); align-self: center; margin-right: 4px; }
-.pill { font-size: 12px; padding: 4px 12px; border-radius: 20px; border: 0.5px solid var(--color-border-secondary); background: transparent; color: var(--color-text-secondary); cursor: pointer; transition: all 0.15s; }
-.pill.active { background: var(--color-background-secondary); color: var(--color-text-primary); border-color: var(--color-border-primary); font-weight: 500; }
-.legend { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 1rem; font-size: 12px; color: var(--color-text-secondary); }
-.legend-item { display: flex; align-items: center; gap: 5px; }
-.legend-swatch { width: 24px; height: 3px; border-radius: 2px; }
-.chart-wrap { position: relative; width: 100%; height: 320px; }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Maternal Mortality in the U.S. | NVSS Data</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-@media (max-width: 480px) {
-  .chart-wrap { height: 220px; }
-  .pill { padding: 8px 14px; font-size: 13px; }
-  .legend { gap: 8px; font-size: 11px; }
-}
-</style>
-
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<div class="mm-wrap">
-<h2 class="sr-only">Maternal mortality rates by race/ethnicity and age group, United States 2018&#x2013;2023</h2>
-<div class="controls">
-  <span class="ctrl-label">Age group:</span>
-  <div class="ctrl-group" id="age-pills">
-    <button class="pill active" data-age="all">All ages</button>
-    <button class="pill" data-age="u25">Under 25</button>
-    <button class="pill" data-age="25-39">25&#x2013;39</button>
-    <button class="pill" data-age="40plus">40+</button>
-  </div>
-</div>
-<div class="legend" id="legend"></div>
-<div class="chart-wrap"><canvas id="mmChart" role="img" aria-label="Line chart of maternal mortality rates per 100,000 live births by race and age, 2018 to 2023. Black non-Hispanic women consistently show the highest rates, peaking in 2021.">Maternal mortality rates 2018&#x2013;2023. Black non-Hispanic rates peaked at 69.9 in 2021. Total rates peaked at 32.9 in 2021.</canvas></div>
-</div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-<script>
-const labels = ['2018','2019','2020','2021','2022','2023'];
-const series = {
-  'Total': {
-    color: '#888780',
-    dash: [],
-    all: [17.4,20.1,23.8,32.9,22.3,18.6],
-    u25: [10.6,12.6,13.8,20.4,14.4,12.5],
-    '25-39': [16.6,19.9,22.8,31.3,21.1,18.1],
-    '40plus': [81.9,75.5,107.9,138.5,87.1,59.8]
-  },
-  'Black, non-Hispanic': {
-    color: '#D4537E',
-    dash: [],
-    all: [37.3,44.0,55.3,69.9,49.5,50.3],
-    u25: [15.3,18.8,28.8,41.5,31.3,28.0],
-    '25-39': [38.2,49.7,56.3,69.3,49.2,53.6],
-    '40plus': [239.9,166.5,263.1,300.8,174.5,132.9]
-  },
-  'White, non-Hispanic': {
-    color: '#378ADD',
-    dash: [6,3],
-    all: [14.9,17.9,19.1,26.6,19.0,14.5],
-    u25: [10.5,13.1,11.5,16.9,10.8,8.4],
-    '25-39': [13.8,16.8,17.6,24.5,17.9,13.8],
-    '40plus': [72.0,75.2,96.8,126.9,83.9,56.6]
-  },
-  'Hispanic': {
-    color: '#1D9E75',
-    dash: [4,4],
-    all: [11.8,12.6,18.2,28.0,16.9,12.4],
-    u25: [7.6,8.5,7.7,14.1,9.5,10.1],
-    '25-39': [12.4,12.2,19.2,30.8,16.9,12.0],
-    '40plus': [38.6,57.3,86.0,86.4,70.7,35.8]
-  },
-  'Asian, non-Hispanic': {
-    color: '#7F77DD',
-    dash: [2,3],
-    all: [13.3,13.8,12.3,16.8,13.2,10.7],
-    u25: [null,null,null,null,null,null],
-    '25-39': [11.8,13.3,10.4,12.7,10.9,8.9],
-    '40plus': [null,null,null,null,null,null]
-  }
-};
-
-let currentAge = 'all';
-let chart;
-
-function buildLegend() {
-  const el = document.getElementById('legend');
-  el.innerHTML = Object.entries(series).map(([name, s]) => {
-    const dashStyle = s.dash.length ? `repeating-linear-gradient(90deg,${s.color} 0,${s.color} 6px,transparent 6px,transparent ${6+s.dash[1]}px)` : `linear-gradient(${s.color},${s.color})`;
-    return `<span class="legend-item"><span class="legend-swatch" style="background:${dashStyle};"></span>${name}</span>`;
-  }).join('');
-}
-
-function makeDatasets(age) {
-  return Object.entries(series).map(([name, s]) => ({
-    label: name,
-    data: s[age],
-    borderColor: s.color,
-    borderDash: s.dash,
-    backgroundColor: s.color + '18',
-    pointRadius: 4,
-    pointHoverRadius: 6,
-    borderWidth: 2,
-    tension: 0.3,
-    spanGaps: false
-  }));
-}
-
-function initChart(age) {
-  const ctx = document.getElementById('mmChart').getContext('2d');
-  if (chart) chart.destroy();
-  chart = new Chart(ctx, {
-    type: 'line',
-    data: { labels, datasets: makeDatasets(age) },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: ctx => {
-              if (ctx.raw === null) return null;
-              return ` ${ctx.dataset.label}: ${ctx.raw.toFixed(1)}`;
-            },
-            title: items => `Year: ${items[0].label}`
-          },
-          filter: item => item.raw !== null
-        }
-      },
-      scales: {
-        x: {
-          grid: { color: 'rgba(128,128,128,0.12)' },
-          ticks: { font: { size: 12 }, color: '#888780' }
-        },
-        y: {
-          grid: { color: 'rgba(128,128,128,0.12)' },
-          ticks: {
-            font: { size: 12 }, color: '#888780',
-            callback: v => v.toFixed(0)
-          },
-          title: {
-            display: true,
-            text: 'Deaths per 100,000 live births',
-            font: { size: 11 },
-            color: '#888780'
-          }
-        }
-      }
+    body {
+      font-family: 'Georgia', serif;
+      background: #f7f5f2;
+      color: #1a1a1a;
+      min-height: 100vh;
+      padding: 2rem 1rem;
     }
-  });
-}
 
-buildLegend();
-initChart(currentAge);
+    .page-wrap {
+      max-width: 860px;
+      margin: 0 auto;
+    }
 
-document.getElementById('age-pills').addEventListener('click', e => {
-  const btn = e.target.closest('[data-age]');
-  if (!btn) return;
-  document.querySelectorAll('[data-age]').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  currentAge = btn.dataset.age;
-  initChart(currentAge);
-});
-</script>
+    header {
+      border-left: 4px solid #D4537E;
+      padding-left: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    header h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      line-height: 1.3;
+      color: #1a1a1a;
+    }
+
+    header p {
+      font-size: 0.85rem;
+      color: #666;
+      margin-top: 0.4rem;
+      font-family: 'Arial', sans-serif;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.07);
+      padding: 1.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 1.25rem;
+    }
+
+    .ctrl-label {
+      font-size: 12px;
+      font-family: 'Arial', sans-serif;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-right: 4px;
+    }
+
+    .ctrl-group {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .pill {
+      font-size: 12px;
+      font-family: 'Arial', sans-serif;
+      padding: 5px 14px;
+      border-radius: 20px;
+      border: 1px solid #ddd;
+      background: transparent;
+      color: #666;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .pill:hover { border-color: #aaa; color: #333; }
+
+    .pill.active {
+      background: #D4537E;
+      color: #fff;
+      border-color: #D4537E;
+      font-weight: 600;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      margin-bottom: 1.25rem;
+      font-size: 12px;
+      font-family: 'Arial', sans-serif;
+      color: #555;
+    }
+
+    .legend-item { display: flex; align-items: center; gap: 6px; }
+    .legend-swatch { width: 24px; height: 3px; border-radius: 2px; flex-shrink: 0; }
+
+    .chart-wrap {
+      position: relative;
+      width: 100%;
+      height: 340px;
+    }
+
+    .source {
+      font-size: 11px;
+      font-family: 'Arial', sans-serif;
+      color: #999;
+      margin-top: 1rem;
+      line-height: 1.5;
+    }
+
+    .source a { color: #888; }
+
+    .callout {
+      background: #fff5f8;
+      border-left: 3px solid #D4537E;
+      border-radius: 6px;
+      padding: 1rem 1.25rem;
+      font-family: 'Arial', sans-serif;
+      font-size: 0.85rem;
+      color: #444;
+      line-height: 1.6;
+    }
+
+    .callout strong { color: #D4537E; }
+
+    @media (max-width: 480px) {
+      header h1 { font-size: 1.15rem; }
+      .card { padding: 1.25rem; }
+      .chart-wrap { height: 220px; }
+      .pill { padding: 8px 14px; font-size: 13px; }
+      .legend { gap: 8px; font-size: 11px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-wrap">
+
+    <header>
+      <h1>Maternal Mortality in the United States, 2018–2023</h1>
+      <p>Deaths per 100,000 live births &mdash; by race/ethnicity and age group &bull; Source: CDC NVSS</p>
+    </header>
+
+    <div class="card">
+      <div class="callout">
+        <strong>Black non-Hispanic women</strong> face maternal mortality rates 2–3&times; higher than other groups &mdash; a disparity that persisted even as overall rates declined after 2021.
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="controls">
+        <span class="ctrl-label">Age group:</span>
+        <div class="ctrl-group" id="age-pills">
+          <button class="pill active" data-age="all">All ages</button>
+          <button class="pill" data-age="u25">Under 25</button>
+          <button class="pill" data-age="25-39">25&ndash;39</button>
+          <button class="pill" data-age="40plus">40+</button>
+        </div>
+      </div>
+      <div class="legend" id="legend"></div>
+      <div class="chart-wrap">
+        <canvas id="mmChart" role="img"
+          aria-label="Line chart of maternal mortality rates per 100,000 live births by race and age, 2018 to 2023. Black non-Hispanic women consistently show the highest rates, peaking in 2021.">
+          Maternal mortality rates 2018&ndash;2023. Black non-Hispanic rates peaked at 69.9 in 2021. Total rates peaked at 32.9 in 2021.
+        </canvas>
+      </div>
+      <p class="source">
+        Data: National Vital Statistics System (NVSS), Centers for Disease Control and Prevention. Rates are per 100,000 live births. Null values indicate insufficient data for reliable estimates.
+      </p>
+    </div>
+
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <script>
+    const labels = ['2018','2019','2020','2021','2022','2023'];
+    const series = {
+      'Total': {
+        color: '#888780', dash: [],
+        all: [17.4,20.1,23.8,32.9,22.3,18
